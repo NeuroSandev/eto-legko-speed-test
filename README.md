@@ -54,3 +54,11 @@ Total downloaded: 10.00 MiB (10485760 B)
 Download speed: 7.151 MiB/s
 Download speed: 59.955 Mbit/s
 ```
+
+## Тесты
+
+Тест поднимает локальный HTTP-сервер с файлом известного размера и проверяет оба скрипта: 10 запросов, точный объём, редиректы, ошибки (404, нет аргумента).
+
+```bash
+python3 -m unittest -v tests.test_scripts
+```
