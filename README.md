@@ -1,6 +1,6 @@
 # Internet Speed Checker (test task)
 
-Консольный скрипт на Node.js, который:
+Консольный скрипт в двух вариантах — Node.js (`src/speed-check.js`) и Python (`speed_check.py`). Оба делают одно и то же:
 
 - принимает URL ресурса для скачивания;
 - делает 10 последовательных GET-запросов;
@@ -10,18 +10,21 @@
 
 ## Требования
 
-- Node.js 18+
+- Node.js 18+ **или** Python 3.9+
+- Внешних зависимостей нет (только стандартная библиотека)
 
 ## Запуск
 
+Node.js:
+
 ```bash
-npm start -- "https://example.com/path/to/file"
+npm start -- "https://proof.ovh.net/files/1Mb.dat"
 ```
 
-Пример:
+Python:
 
 ```bash
-npm start -- "https://speed.hetzner.de/1MB.bin"
+python3 speed_check.py "https://proof.ovh.net/files/1Mb.dat"
 ```
 
 ## Что считается
