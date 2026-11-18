@@ -5,7 +5,7 @@ import subprocess
 import sys
 import threading
 import unittest
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -14,16 +14,21 @@ EXPECTED_REQUESTS = 10
 
 
 class Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"  # enables keep-alive
     hits = 0
+    connections: set = set()  # client (ip, port) pairs = distinct TCP connections
 
     def do_GET(self):
+        Handler.connections.add(self.client_address)
         if self.path == "/missing":
             self.send_response(404)
+            self.send_header("Content-Length", "0")
             self.end_headers()
             return
         if self.path == "/redirect":
             self.send_response(302)
             self.send_header("Location", "/file")
+            self.send_header("Content-Length", "0")
             self.end_headers()
             return
         Handler.hits += 1
@@ -39,7 +44,7 @@ class Handler(BaseHTTPRequestHandler):
 class SpeedScriptsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.server = HTTPServer(("127.0.0.1", 0), Handler)
+        cls.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         cls.base = f"http://127.0.0.1:{cls.server.server_port}"
         threading.Thread(target=cls.server.serve_forever, daemon=True).start()
 
@@ -49,6 +54,7 @@ class SpeedScriptsTest(unittest.TestCase):
 
     def setUp(self):
         Handler.hits = 0
+        Handler.connections = set()
 
     def run_script(self, command, path):
         return subprocess.run(
@@ -79,6 +85,14 @@ class SpeedScriptsTest(unittest.TestCase):
 
     def test_python_follows_redirect(self):
         self.check_success([sys.executable, str(ROOT / "speed_check.py")], "/redirect")
+
+    def test_python_reuses_connection(self):
+        self.check_success([sys.executable, str(ROOT / "speed_check.py")])
+        self.assertEqual(len(Handler.connections), 1)
+
+    def test_node_reuses_connection(self):
+        self.check_success(["node", str(ROOT / "src" / "speed-check.js")])
+        self.assertEqual(len(Handler.connections), 1)
 
     def test_python_errors(self):
         self.check_errors([sys.executable, str(ROOT / "speed_check.py")])
