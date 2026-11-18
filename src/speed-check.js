@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 
 import { performance } from 'node:perf_hooks';
-import { request as httpRequest } from 'node:http';
-import { request as httpsRequest } from 'node:https';
+import { Agent as HttpAgent, request as httpRequest } from 'node:http';
+import { Agent as HttpsAgent, request as httpsRequest } from 'node:https';
 
 const REQUEST_COUNT = 10;
+
+// Keep-alive is set explicitly: it is the default only since Node 19.
+const httpAgent = new HttpAgent({ keepAlive: true, maxSockets: 1 });
+const httpsAgent = new HttpsAgent({ keepAlive: true, maxSockets: 1 });
 
 function formatBytes(bytes) {
   const units = ['B', 'KiB', 'MiB', 'GiB'];
@@ -29,10 +33,12 @@ function downloadOnce(inputUrl, redirectsLeft = 5) {
       return;
     }
 
-    const requester = parsedUrl.protocol === 'https:' ? httpsRequest : httpRequest;
+    const isHttps = parsedUrl.protocol === 'https:';
+    const requester = isHttps ? httpsRequest : httpRequest;
+    const agent = isHttps ? httpsAgent : httpAgent;
 
     const startedAt = performance.now();
-    const req = requester(parsedUrl, { method: 'GET' }, (res) => {
+    const req = requester(parsedUrl, { method: 'GET', agent }, (res) => {
       const statusCode = res.statusCode ?? 0;
 
       if (statusCode >= 300 && statusCode < 400 && res.headers.location) {
@@ -116,7 +122,12 @@ async function main() {
   console.log(`Download speed: ${megabitsPerSecond.toFixed(3)} Mbit/s`);
 }
 
-main().catch((error) => {
-  console.error(`Error: ${error.message}`);
-  process.exit(1);
-});
+main()
+  .catch((error) => {
+    console.error(`Error: ${error.message}`);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    httpAgent.destroy();
+    httpsAgent.destroy();
+  });
